@@ -5,7 +5,7 @@
 import json
 import dateutil.parser
 import babel
-from flask import Flask, render_template, request, Response, flash, redirect, url_for
+from flask import Flask, render_template, request, Response, flash, redirect, url_for,abort
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 import logging
@@ -82,7 +82,6 @@ def venues():
         temp['venues'] = [venue_data]
       prev_city = venue.city
       prev_state = venue.state
-  print(data)
   data.append(temp)
   
   return render_template('pages/venues.html', areas=data);
@@ -114,8 +113,12 @@ def search_venues():
 def show_venue(venue_id):
   # shows the venue page with the given venue_id
   # replace with real venue data from the venues table, using venue_id
-  venue = Venue.query.get(venue_id)
+  #venue = Venue.query.get(venue_id) #The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0
+  venue = Venue.query.filter_by(id=venue_id).first()
 
+  if venue is None:
+        return abort(404)
+  
   past_shows = list(filter(lambda x: x.start_time <
                              datetime.today(), venue.shows))
   upcoming_shows = list(filter(lambda x: x.start_time >=
@@ -155,7 +158,8 @@ def create_venue_submission():
     venue.facebook_link = request.form.get('facebook_link')
     venue.image_link = request.form.get('image_link')
     venue.website = request.form.get('website')
-    venue.seeking_talent = request.form.get('seeking_talent')
+    if request.form.get('seeking_talent') == 'y' :
+      venue.seeking_talent = True
     venue.seeking_description = request.form.get('seeking_description')
     db.session.add(venue)
     db.session.commit()
@@ -204,14 +208,16 @@ def show_artist(artist_id):
   # shows the artist page with the given artist_id
   # replace with real artist data from the artist table, using artist_id
   artist = Artist.query.get(artist_id)
+  if artist is None:
+    return abort(404)
 
   past_shows = list(filter(lambda x: x.start_time <
-                             datetime.today(), artist.shows))  #Anoymouse function that filters past shows
+                             datetime.today(), artist.shows))  
   upcoming_shows = list(filter(lambda x: x.start_time >=
                                  datetime.today(), artist.shows))
 
   past_shows = list(map(lambda x: x.show_venue(), past_shows))
-  upcoming_shows = list(map(lambda x: x.show_venue(), upcoming_shows))  #Anoymouse function that filters upcoming shows
+  upcoming_shows = list(map(lambda x: x.show_venue(), upcoming_shows))  
 
   data = artist.to_dict()
   print(data)
@@ -225,8 +231,9 @@ def show_artist(artist_id):
 #  ----------------------------------------------------------------
 @app.route('/artists/<int:artist_id>/edit', methods=['GET'])
 def edit_artist(artist_id):
-  form = ArtistForm()
-  artist = Artist.query.get(artist_id)
+  
+  artist = Artist.query.get(artist_id).to_dict()
+  form = ArtistForm(data=artist)
   # populate form with fields from artist with ID <artist_id>
   return render_template('forms/edit_artist.html', form=form, artist=artist)
 
@@ -247,8 +254,13 @@ def edit_artist_submission(artist_id):
     artist.website = request.form.get('website')
     artist.image_link = request.form.get('image_link')
     artist.facebook_link = request.form.get('facebook_link')
-    artist.seeking_description = request.form.get('seeking_description')
-    db.session.add(artist)
+    if request.form.get('seeking_venue') == 'y':
+      artist.seeking_venue = True
+      artist.seeking_description = request.form.get('seeking_description')
+    else:
+      artist.seeking_venue = False
+      artist.seeking_description = ""
+    
     db.session.commit()
   except:
     error = True
@@ -264,16 +276,15 @@ def edit_artist_submission(artist_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
-  form = VenueForm()
-  venue = Venue.query.get(venue_id).to_dict()
-  # populate form with values from venue with ID <venue_id>
+  venue = Venue.query.filter_by(id=venue_id).first().to_dict()
+  form = VenueForm(data=venue)
   return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
   # take values from the form submitted, and update existing
   # venue record with ID <venue_id> using the new attributes
-  venue = Venue.query.get(venue_id)
+  venue = Venue.query.filter_by(id=venue_id).first()
 
   error = False
   try:
@@ -285,7 +296,15 @@ def edit_venue_submission(venue_id):
     tmp_genres = request.form.getlist('genres')
     venue.genres = ','.join(tmp_genres)  # convert list to string
     venue.facebook_link = request.form.get('facebook_link')
-    db.session.add(venue)
+    venue.image_link = request.form.get('')
+    venue.website = request.form.get('website')
+    if request.form.get('seeking_talent') == 'y' :
+      venue.seeking_talent = True
+      venue.seeking_description =request.form.get('seeking_description')
+    else:
+      venue.seeking_talent = False
+      venue.seeking_description = ""
+    #db.session.add(venue)
     db.session.commit()
   except:
     error = True
@@ -327,7 +346,10 @@ def create_artist_submission():
     artist.website = request.form.get('website')
     artist.image_link = request.form.get('image_link')
     artist.facebook_link = request.form.get('facebook_link')
+    if request.form.get('seeking_venue')=='y':
+      artist.seeking_venue = True
     artist.seeking_description = request.form.get('seeking_description')
+
     db.session.add(artist)
     db.session.commit()
   except:
@@ -432,14 +454,14 @@ if not app.debug:
 #----------------------------------------------------------------------------#
 # Launch.
 #----------------------------------------------------------------------------#
-
+'''
 # Default port:
 if __name__ == '__main__':
     app.run()
-
+'''
 # Or specify port manually:
-'''
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 3000))
     app.run(host='0.0.0.0', port=port)
-'''
+
